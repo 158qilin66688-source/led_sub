@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LED跑马灯">
+  <title>LED跑马灯</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+    html,body { width:100%; height:100%; overflow:hidden; background:#000; font-family:-apple-system,sans-serif; touch-action:manipulation; }
+    .app-container { display:flex; flex-direction:column; height:100vh; height:-webkit-fill-available; width:100vw; }
+    .controls { background:rgba(15,15,20,0.95); backdrop-filter:blur(25px); -webkit-backdrop-filter:blur(25px); padding:10px 8px; display:flex; flex-direction:column; gap:7px; z-index:100; flex-shrink:0; border-bottom:0.5px solid rgba(255,255,255,0.15); transition:opacity 0.3s; max-height:48vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    .controls.hide { opacity:0.12; pointer-events:none; }
+    .row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; min-height:42px; }
+    input,button,select { padding:8px 10px; border:none; border-radius:20px; font-size:14px; background:rgba(255,255,255,0.12); color:#fff; outline:none; min-height:42px; display:flex; align-items:center; justify-content:center; font-weight:500; -webkit-appearance:none; appearance:none; transition:all 0.15s; border:1px solid rgba(255,255,255,0.2); white-space:nowrap; }
+    button { cursor:pointer; background:rgba(255,255,255,0.18); font-weight:600; }
+    button:active { transform:scale(0.94); background:rgba(255,255,255,0.3); }
+    input[type="text"] { flex:2; min-width:160px; font-size:18px; font-weight:bold; background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.35); padding:0 14px; letter-spacing:2px; }
+    input[type="range"] { flex:1; padding:0; background:transparent; height:28px; border:none; }
+    input[type="color"] { width:40px; height:40px; padding:2px; border-radius:50%; border:2px solid #fff; background:transparent; }
+    .btn-scroll-on { background:#ff2d78; border-color:#ff6b9d; }
+    .btn-scroll-off { background:#4a4a5a; color:#bbb; }
+    .btn-marquee-on { background:#00e5ff; color:#000; border-color:#00e5ff; }
+    .btn-marquee-off { background:#3a3a4a; color:#ccc; }
+    .btn-full { background:#30c75c; color:#fff; }
+    .btn-share { background:#ff9500; color:#fff; }
+    .style-btn { background:#2c2c3a; color:#ccc; border:1px solid #555; padding:6px 12px; font-size:13px; font-weight:600; }
+    .style-btn.active { background:#00e5ff; color:#000; border-color:#fff; box-shadow:0 0 15px #00e5ff; }
+    .save-btn { background:#2e86de; color:#fff; }
+    .del-btn { background:#e74c3c; color:#fff; }
+    .emoji-btn { font-size:22px; padding:4px 8px; background:rgba(255,255,255,0.08); border-radius:16px; min-height:38px; }
+    .color-pre { width:38px; height:38px; padding:0; border-radius:50%; border:2px solid #fff; }
+    .label { font-size:12px; color:#aaa; min-width:50px; }
+    .val { font-size:12px; color:#fff; min-width:35px; text-align:center; }
+    #led-box { flex:1; width:100%; background:#000; overflow:hidden; position:relative; cursor:pointer; }
+    .text-container { position:absolute; top:50%; transform:translateY(-50%); white-space:nowrap; font-weight:900; z-index:2; padding:8px 20px; text-shadow:0 0 18px currentColor; letter-spacing:3px; pointer-events:none; will-change:left; -webkit-font-smoothing:antialiased; }
+    .marquee-base { position:absolute; top:-4px; left:-4px; right:-4px; bottom:-4px; border:4px solid transparent; border-radius:28px; -webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0); -webkit-mask-composite:xor; mask-composite:exclude; z-index:1; pointer-events:none; }
+    .marquee-rainbow { background:linear-gradient(90deg,#ff2400,#ffd800,#00e1ff,#9d00ff,#ff2400) border-box; background-size:500% 100%; animation:flow 2.2s linear infinite; }
+    .marquee-gold { background:linear-gradient(90deg,#fff700,#ffaa00,#fff700) border-box; background-size:300% 100%; animation:flow 1.8s linear infinite; }
+    .marquee-neon { background:linear-gradient(90deg,#00ffff,#ff00ff,#00ffff) border-box; background-size:300% 100%; animation:pingpong 2s ease-in-out infinite; }
+    .marquee-red { background:linear-gradient(90deg,#ff0000,#ff5500,#ff0000) border-box; background-size:200% 100%; animation:breath 2s ease-in-out infinite; }
+    .marquee-fast { background:linear-gradient(90deg,#ffffff,#88ffff,#ffffff) border-box; background-size:400% 100%; animation:flow 0.9s linear infinite; }
+    @keyframes flow { 0%{background-position:0% 50%} 100%{background-position:500% 50%} }
+    @keyframes pingpong { 0%{background-position:0% 50%} 50%{background-position:300% 50%} 100%{background-position:0% 50%} }
+    @keyframes breath { 0%{opacity:0.5} 50%{opacity:1} 100%{opacity:0.5} }
+    .share-tip { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#ff9500; color:#000; padding:12px 24px; border-radius:30px; font-weight:bold; z-index:200; display:none; box-shadow:0 4px 20px rgba(255,149,0,0.5); animation:bounce 0.6s ease; }
+    @keyframes bounce { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-10px)} }
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <div class="controls" id="controlPanel">
+    <div class="row">
+      <select id="textPreset" style="flex:1;"><option value="">📋 历史文案</option></select>
+      <button class="save-btn" id="saveBtn">💾</button>
+      <button class="del-btn" id="delBtn">🗑️</button>
+      <button class="btn-share" id="shareBtn">🔗</button>
+    </div>
+    <div class="row">
+      <select id="fontFamily" style="flex:1;">
+        <option value="sans-serif">系统默认</option>
+        <option value="'PingFang SC', sans-serif">苹方黑体</option>
+        <option value="Georgia, serif">衬线字体</option>
+      </select>
+    </div>
+    <div class="row" id="emojiWrap">
+      <button class="emoji-btn">❤️</button><button class="emoji-btn">✨</button><button class="emoji-btn">🌟</button><button class="emoji-btn">🔥</button><button class="emoji-btn">⚡</button><button class="emoji-btn">🎤</button><button class="emoji-btn">🎵</button><button class="emoji-btn">🎉</button>
+    </div>
+    <div class="row"><input type="text" id="input-text" value="LOVE 2026" placeholder="输入文字..." autocomplete="off"></div>
+    <div class="row" id="colorWrap">
+      <button class="color-pre" data-color="#ffff00" style="background:#ffff00;"></button>
+      <button class="color-pre" data-color="#ff0000" style="background:#ff0000;"></button>
+      <button class="color-pre" data-color="#00ff00" style="background:#00ff00;"></button>
+      <button class="color-pre" data-color="#00ffff" style="background:#00ffff;"></button>
+      <button class="color-pre" data-color="#ff00ff" style="background:#ff00ff;"></button>
+      <input type="color" id="color-text" value="#ffff00">
+      <input type="color" id="color-bg" value="#000000">
+    </div>
+    <div class="row"><span class="label">🔤 字号</span><input type="range" id="range-size" min="30" max="300" value="85"><span class="val" id="size-val">85px</span></div>
+    <div class="row"><span class="label">⚡ 速度</span><input type="range" id="range-speed" min="1" max="30" value="10"><span class="val" id="speed-val">10</span></div>
+    <div class="row" id="styleWrap">
+      <button class="style-btn active" data-style="rainbow">🌈彩虹</button>
+      <button class="style-btn" data-style="gold">✨金色</button>
+      <button class="style-btn" data-style="neon">💜霓彩</button>
+      <button class="style-btn" data-style="red">❤️炽红</button>
+      <button class="style-btn" data-style="fast">⚡极速</button>
+      <button id="btn-marquee" class="btn-marquee-off">💡边框</button>
+      <button id="btn-scroll" class="btn-scroll-on">⏸️静止</button>
+      <button class="btn-full" id="fullBtn">📱全屏</button>
+    </div>
+  </div>
+  <div id="led-box"></div>
+  <div class="share-tip" id="shareTip">✅ 链接已复制！</div>
+</div>
+<script>
+(function(){
+  let ani=null,scrollOn=true,lightOn=false,style='rainbow',pos=window.innerWidth,font='sans-serif';
+  let history=JSON.parse(localStorage.getItem('led_text')||'[]');
+  const panel=document.getElementById('controlPanel'),box=document.getElementById('led-box');
+  const preset=document.getElementById('textPreset'),fontSel=document.getElementById('fontFamily');
+  const input=document.getElementById('input-text'),cText=document.getElementById('color-text'),cBg=document.getElementById('color-bg');
+  const sizeS=document.getElementById('range-size'),speedS=document.getElementById('range-speed');
+  const btnS=document.getElementById('btn-scroll'),btnM=document.getElementById('btn-marquee');
+  
+  function updatePreset(){
+    preset.innerHTML='<option value="">📋 历史文案</option>';
+    history.forEach((t,i)=>{const o=document.createElement('option');o.value=i;o.textContent=t.length>15?t.slice(0,13)+'…':t;preset.appendChild(o)});
+  }
+  
+  function stop(){if(ani){cancelAnimationFrame(ani);ani=null}}
+  
+  function render(){
+    stop();
+    const txt=input.value.trim()||'LED',color=cText.value,bg=cBg.value,fsize=sizeS.value+'px',spd=parseInt(speedS.value);
+    box.style.background=bg;box.innerHTML='';
+    const el=document.createElement('div');el.className='text-container';el.textContent=txt;
+    el.style.color=color;el.style.fontSize=fsize;el.style.fontFamily=font;
+    if(!scrollOn){el.style.left='50%';el.style.transform='translate(-50%,-50%)';box.appendChild(el);if(lightOn){const f=document.createElement('div');f.className='marquee-base marquee-'+style;el.appendChild(f)}return}
+    el.style.left=pos+'px';el.style.transform='translateY(-50%)';box.appendChild(el);
+    if(lightOn){const f=document.createElement('div');f.className='marquee-base marquee-'+style;el.appendChild(f)}
+    function anim(){if(!scrollOn){stop();return}
+      const l=parseFloat(el.style.left)||pos,nl=l-(spd/8);
+      if(nl<-el.offsetWidth-50)el.style.left=window.innerWidth+20+'px';else el.style.left=nl+'px';
+      ani=requestAnimationFrame(anim)}
+    ani=requestAnimationFrame(anim);
+  }
+  
+  btnS.onclick=()=>{scrollOn=!scrollOn;btnS.textContent=scrollOn?'⏸️静止':'▶️滚动';btnS.className=scrollOn?'btn-scroll-on':'btn-scroll-off';if(!scrollOn)stop();render()};
+  btnM.onclick=()=>{lightOn=!lightOn;btnM.textContent=lightOn?'💡边框开':'💡边框';btnM.className=lightOn?'btn-marquee-on':'btn-marquee-off';render()};
+  
+  preset.onchange=function(){if(this.value!==''){input.value=history[parseInt(this.value)];render()}};
+  fontSel.onchange=function(){font=this.value;render()};
+  document.getElementById('saveBtn').onclick=()=>{const t=input.value.trim();if(t&&!history.includes(t)){history.push(t);if(history.length>20)history.shift();localStorage.setItem('led_text',JSON.stringify(history));updatePreset()}};
+  document.getElementById('delBtn').onclick=()=>{if(preset.value!==''){history.splice(parseInt(preset.value),1);localStorage.setItem('led_text',JSON.stringify(history));updatePreset()}};
+  
+  document.querySelectorAll('#emojiWrap .emoji-btn').forEach(b=>b.onclick=()=>{input.value+=b.textContent;render()});
+  document.querySelectorAll('#colorWrap .color-pre').forEach(b=>b.onclick=()=>{cText.value=b.dataset.color;render()});
+  document.querySelectorAll('#styleWrap .style-btn').forEach(b=>b.onclick=function(){style=this.dataset.style;document.querySelectorAll('.style-btn').forEach(x=>x.classList.remove('active'));this.classList.add('active');if(lightOn)render()});
+  
+  document.getElementById('shareBtn').onclick=()=>{const url=URL.createObjectURL(new Blob(['<!DOCTYPE html>\n'+document.documentElement.outerHTML],{type:'text/html'}));window.open(url,'_blank');setTimeout(()=>URL.revokeObjectURL(url),300000)};
+  document.getElementById('fullBtn').onclick=()=>{const e=document.documentElement;if(e.requestFullscreen)e.requestFullscreen().catch(()=>{});else if(e.webkitRequestFullscreen)e.webkitRequestFullscreen();if(/iPhone|iPad|iPod/.test(navigator.userAgent)){panel.classList.add('hide');setTimeout(()=>panel.classList.remove('hide'),4000)}};
+  
+  input.oninput=render;cText.oninput=render;cBg.oninput=render;
+  sizeS.oninput=function(){document.getElementById('size-val').textContent=this.value+'px';render()};
+  speedS.oninput=function(){document.getElementById('speed-val').textContent=this.value;render()};
+  box.onclick=function(e){if(e.target===box)panel.classList.toggle('hide')};
+  window.onresize=()=>{pos=window.innerWidth;if(scrollOn)render()};
+  
+  updatePreset();render();
+})();
+</script>
+</body>
+</html>
