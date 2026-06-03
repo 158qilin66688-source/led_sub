@@ -3,12 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, minimal-ui">
+  
+  <!-- PWA 主屏幕配置 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="LED跑马灯">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#000000">
-  <title>LED跑马灯</title>
+  <meta name="apple-touch-fullscreen" content="yes">
+  
+  <!-- 主屏幕图标 -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,
+    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'>
+      <rect width='180' height='180' fill='%23000' rx='30'/>
+      <text x='90' y='120' font-size='100' text-anchor='middle' fill='%23ffff00'>✨</text>
+    </svg>">
+  
+  <title>LED跑马灯 · 应援灯牌</title>
+  
   <style>
     * {
       margin: 0;
@@ -25,11 +37,14 @@
       height: 100%;
       overflow: hidden;
       background: #000;
-      font-family: -apple-system, 'PingFang SC', sans-serif;
+      font-family: -apple-system, 'PingFang SC', 'HarmonyOS Sans', sans-serif;
       touch-action: manipulation;
       position: fixed;
       top: 0;
       left: 0;
+      /* 主屏幕模式下使用安全区域 */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
     .app-container {
@@ -41,7 +56,47 @@
       position: relative;
     }
 
-    /* 控制面板 - 绝对定位悬浮 */
+    /* 主屏幕模式提示 */
+    .standalone-tip {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.9);
+      color: #fff;
+      padding: 20px 30px;
+      border-radius: 20px;
+      text-align: center;
+      z-index: 999;
+      display: none;
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .standalone-tip h2 {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    
+    .standalone-tip p {
+      font-size: 14px;
+      color: #aaa;
+      margin: 5px 0;
+    }
+    
+    .standalone-tip .close-btn {
+      margin-top: 15px;
+      background: #00e5ff;
+      color: #000;
+      border: none;
+      padding: 10px 30px;
+      border-radius: 20px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* 控制面板 */
     .controls {
       position: absolute;
       top: 0;
@@ -180,7 +235,7 @@
     .label { font-size: 11px; color: #aaa; min-width: 45px; }
     .val { font-size: 11px; color: #fff; min-width: 30px; text-align: center; }
 
-    /* LED 显示区 - 占满整个屏幕 */
+    /* LED 显示区 */
     #led-box {
       position: fixed;
       top: 0;
@@ -202,7 +257,7 @@
       font-weight: 900;
       z-index: 2;
       padding: 8px 20px;
-      text-shadow: 0 0 20px currentColor;
+      text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
       letter-spacing: 3px;
       pointer-events: none;
       will-change: left;
@@ -266,17 +321,18 @@
     /* 全屏提示 */
     .fullscreen-hint {
       position: fixed;
-      bottom: 20px;
+      bottom: 30px;
       left: 50%;
       transform: translateX(-50%);
       background: rgba(0,0,0,0.8);
       color: #fff;
-      padding: 8px 16px;
+      padding: 8px 20px;
       border-radius: 20px;
       font-size: 12px;
       z-index: 200;
       display: none;
       backdrop-filter: blur(10px);
+      white-space: nowrap;
     }
 
     /* 横屏时自动隐藏控制面板 */
@@ -285,7 +341,6 @@
         opacity: 0;
         transform: translateY(-100%);
         pointer-events: none;
-        transition: all 0.3s ease;
       }
       .controls.show {
         opacity: 0.95;
@@ -297,10 +352,10 @@
 </head>
 <body>
 <div class="app-container">
-  <!-- LED 显示区放在最底层 -->
+  <!-- LED 显示区 -->
   <div id="led-box"></div>
   
-  <!-- 控制面板悬浮在顶部 -->
+  <!-- 控制面板 -->
   <div class="controls" id="controlPanel">
     <div class="row">
       <select id="textPreset" style="flex:1;">
@@ -361,7 +416,16 @@
     </div>
   </div>
   
+  <!-- 提示信息 -->
   <div class="fullscreen-hint" id="fullscreenHint">👆 点击屏幕显示控制面板</div>
+  
+  <!-- 主屏幕模式提示 -->
+  <div class="standalone-tip" id="standaloneTip">
+    <h2>✨ 全屏模式已开启</h2>
+    <p>旋转手机至横屏</p>
+    <p>点击屏幕切换控制面板</p>
+    <button class="close-btn" id="closeTipBtn">开始使用</button>
+  </div>
 </div>
 
 <script>
@@ -393,6 +457,34 @@
   const btnS = document.getElementById('btn-scroll');
   const btnM = document.getElementById('btn-marquee');
   const hint = document.getElementById('fullscreenHint');
+  const standaloneTip = document.getElementById('standaloneTip');
+  
+  // 检测是否在主屏幕模式下运行
+  function isStandalone() {
+    return window.navigator.standalone || 
+           window.matchMedia('(display-mode: standalone)').matches;
+  }
+  
+  // 主屏幕模式欢迎提示
+  if(isStandalone()) {
+    setTimeout(() => {
+      standaloneTip.style.display = 'block';
+    }, 500);
+    
+    document.getElementById('closeTipBtn').onclick = function() {
+      standaloneTip.style.display = 'none';
+      // 横屏时自动隐藏面板
+      if(window.innerWidth > window.innerHeight) {
+        panel.classList.add('hidden');
+        panelVisible = false;
+      }
+    };
+    
+    // 3秒后自动关闭提示
+    setTimeout(() => {
+      standaloneTip.style.display = 'none';
+    }, 4000);
+  }
   
   function updatePreset(){
     preset.innerHTML = '<option value="">📋 历史文案</option>';
@@ -460,7 +552,6 @@
     ani = requestAnimationFrame(anim);
   }
   
-  // 切换控制面板
   function togglePanel(){
     panelVisible = !panelVisible;
     if(panelVisible){
@@ -475,7 +566,17 @@
     }
   }
   
-  // 按钮事件
+  // 点击LED区域切换面板
+  box.onclick = function(e){
+    if(e.target === box){
+      togglePanel();
+    }
+  };
+  
+  panel.onclick = function(e){
+    e.stopPropagation();
+  };
+  
   btnS.onclick = (e) => {
     e.stopPropagation();
     scrollOn = !scrollOn;
@@ -491,18 +592,6 @@
     btnM.textContent = lightOn ? '💡边框开' : '💡边框';
     btnM.className = lightOn ? 'btn-marquee-on' : 'btn-marquee-off';
     render();
-  };
-  
-  // 点击LED区域切换面板
-  box.onclick = function(e){
-    if(e.target === box){
-      togglePanel();
-    }
-  };
-  
-  // 点击控制面板空白区域不触发
-  panel.onclick = function(e){
-    e.stopPropagation();
   };
   
   preset.onchange = function(){
@@ -572,21 +661,14 @@
   
   document.getElementById('fullBtn').onclick = (e) => {
     e.stopPropagation();
-    // iOS 特殊处理：隐藏面板并提示横屏
-    if(/iPhone|iPad|iPod/.test(navigator.userAgent)){
-      panel.classList.add('hidden');
-      panelVisible = false;
-      hint.textContent = '📱 请旋转手机至横屏，点击屏幕显示面板';
-      hint.style.display = 'block';
-      setTimeout(() => { hint.style.display = 'none'; }, 3000);
+    if(!isStandalone()){
+      alert('📱 请点击分享按钮 → 添加到主屏幕\n\n即可获得真正全屏体验！');
     }
-    // 尝试标准全屏
-    const el = document.documentElement;
-    if(el.requestFullscreen){
-      el.requestFullscreen().catch(() => {});
-    } else if(el.webkitRequestFullscreen){
-      el.webkitRequestFullscreen();
-    }
+    panel.classList.add('hidden');
+    panelVisible = false;
+    hint.textContent = '📱 旋转手机至横屏获得最佳效果';
+    hint.style.display = 'block';
+    setTimeout(() => { hint.style.display = 'none'; }, 3000);
   };
   
   input.oninput = render;
@@ -603,25 +685,18 @@
     render();
   };
   
-  // 屏幕旋转时处理
   window.addEventListener('orientationchange', function(){
     setTimeout(() => {
       pos = window.innerWidth;
       if(scrollOn) render();
       
-      // 横屏时自动隐藏面板
-      if(window.innerWidth > window.innerHeight){
-        // 横屏
+      if(window.innerWidth > window.innerHeight && isStandalone()){
         panel.classList.add('hidden');
         panelVisible = false;
-        hint.textContent = '👆 点击屏幕显示控制面板';
-        hint.style.display = 'block';
-        setTimeout(() => { hint.style.display = 'none'; }, 2000);
       }
     }, 300);
   });
   
-  // 窗口大小变化
   window.onresize = function(){
     pos = window.innerWidth;
     if(scrollOn) render();
@@ -631,12 +706,14 @@
   updatePreset();
   render();
   
-  // 首次加载提示
-  setTimeout(() => {
-    hint.textContent = '👆 点击屏幕隐藏控制面板';
-    hint.style.display = 'block';
-    setTimeout(() => { hint.style.display = 'none'; }, 3000);
-  }, 1000);
+  // Safari 模式提示添加到主屏幕
+  if(!isStandalone() && /iPhone|iPad|iPod/.test(navigator.userAgent)){
+    setTimeout(() => {
+      hint.textContent = '💡 添加到主屏幕可隐藏地址栏';
+      hint.style.display = 'block';
+      setTimeout(() => { hint.style.display = 'none'; }, 4000);
+    }, 1500);
+  }
   
 })();
 </script>
